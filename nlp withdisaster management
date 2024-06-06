@@ -1,0 +1,1053 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "ea28a0a7",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:16.633198Z",
+     "iopub.status.busy": "2024-06-06T10:34:16.632477Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.166139Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.164902Z"
+    },
+    "papermill": {
+     "duration": 5.54181,
+     "end_time": "2024-06-06T10:34:22.168186",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:16.626376",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Done\n"
+     ]
+    }
+   ],
+   "source": [
+    "#Library imports\n",
+    "\n",
+    "\n",
+    "from nltk.corpus import stopwords\n",
+    "\n",
+    "import torch\n",
+    "\n",
+    "from sklearn.preprocessing import LabelEncoder\n",
+    "\n",
+    "\n",
+    "import numpy as np # linear algebra\n",
+    "import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\n",
+    "\n",
+    "print(\"Done\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "37458926",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.178960Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.178035Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.185294Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.184277Z"
+    },
+    "papermill": {
+     "duration": 0.014397,
+     "end_time": "2024-06-06T10:34:22.187196",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.172799",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/kaggle/input/nlp-getting-started/sample_submission.csv\n",
+      "/kaggle/input/nlp-getting-started/train.csv\n",
+      "/kaggle/input/nlp-getting-started/test.csv\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "for dirname, _, filenames in os.walk('/kaggle/input'):\n",
+    "    for filename in filenames:\n",
+    "        print(os.path.join(dirname, filename))\n",
+    "        \n",
+    "# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using \"Save & Run All\" \n",
+    "# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "672dcd36",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.196814Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.196513Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.272363Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.271287Z"
+    },
+    "papermill": {
+     "duration": 0.08285,
+     "end_time": "2024-06-06T10:34:22.274333",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.191483",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "GPU 0: Tesla P100-PCIE-16GB\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Check if CUDA is available\n",
+    "if torch.cuda.is_available():\n",
+    "    # List visible devices\n",
+    "    for i in range(torch.cuda.device_count()):\n",
+    "        print(f\"GPU {i}: {torch.cuda.get_device_name(i)}\")\n",
+    "else:\n",
+    "    print(\"No GPU available. Using CPU.\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "c4fcc6d5",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.284545Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.284248Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.397354Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.396502Z"
+    },
+    "papermill": {
+     "duration": 0.120404,
+     "end_time": "2024-06-06T10:34:22.399509",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.279105",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>keyword</th>\n",
+       "      <th>location</th>\n",
+       "      <th>text</th>\n",
+       "      <th>target</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>1</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>Our Deeds are the Reason of this #earthquake M...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>4</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>Forest fire near La Ronge Sask. Canada</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>5</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>All residents asked to 'shelter in place' are ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>13,000 people receive #wildfires evacuation or...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>7</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>NaN</td>\n",
+       "      <td>Just got sent this photo from Ruby #Alaska as ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   id keyword location                                               text  \\\n",
+       "0   1     NaN      NaN  Our Deeds are the Reason of this #earthquake M...   \n",
+       "1   4     NaN      NaN             Forest fire near La Ronge Sask. Canada   \n",
+       "2   5     NaN      NaN  All residents asked to 'shelter in place' are ...   \n",
+       "3   6     NaN      NaN  13,000 people receive #wildfires evacuation or...   \n",
+       "4   7     NaN      NaN  Just got sent this photo from Ruby #Alaska as ...   \n",
+       "\n",
+       "   target  \n",
+       "0       1  \n",
+       "1       1  \n",
+       "2       1  \n",
+       "3       1  \n",
+       "4       1  "
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_data = pd.read_csv('/kaggle/input/nlp-getting-started/train.csv')\n",
+    "test_data = pd.read_csv('/kaggle/input/nlp-getting-started/test.csv')\n",
+    "train_data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "5c500226",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.409866Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.409540Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.415354Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.414489Z"
+    },
+    "papermill": {
+     "duration": 0.01387,
+     "end_time": "2024-06-06T10:34:22.418059",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.404189",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[nan 'ablaze' 'accident' 'aftershock' 'airplane%20accident' 'ambulance'\n",
+      " 'annihilated' 'annihilation' 'apocalypse' 'armageddon' 'army' 'arson'\n",
+      " 'arsonist' 'attack' 'attacked' 'avalanche' 'battle' 'bioterror'\n",
+      " 'bioterrorism' 'blaze' 'blazing' 'bleeding' 'blew%20up' 'blight'\n",
+      " 'blizzard' 'blood' 'bloody' 'blown%20up' 'body%20bag' 'body%20bagging'\n",
+      " 'body%20bags' 'bomb' 'bombed' 'bombing' 'bridge%20collapse'\n",
+      " 'buildings%20burning' 'buildings%20on%20fire' 'burned' 'burning'\n",
+      " 'burning%20buildings' 'bush%20fires' 'casualties' 'casualty'\n",
+      " 'catastrophe' 'catastrophic' 'chemical%20emergency' 'cliff%20fall'\n",
+      " 'collapse' 'collapsed' 'collide' 'collided' 'collision' 'crash' 'crashed'\n",
+      " 'crush' 'crushed' 'curfew' 'cyclone' 'damage' 'danger' 'dead' 'death'\n",
+      " 'deaths' 'debris' 'deluge' 'deluged' 'demolish' 'demolished' 'demolition'\n",
+      " 'derail' 'derailed' 'derailment' 'desolate' 'desolation' 'destroy'\n",
+      " 'destroyed' 'destruction' 'detonate' 'detonation' 'devastated'\n",
+      " 'devastation' 'disaster' 'displaced' 'drought' 'drown' 'drowned'\n",
+      " 'drowning' 'dust%20storm' 'earthquake' 'electrocute' 'electrocuted'\n",
+      " 'emergency' 'emergency%20plan' 'emergency%20services' 'engulfed'\n",
+      " 'epicentre' 'evacuate' 'evacuated' 'evacuation' 'explode' 'exploded'\n",
+      " 'explosion' 'eyewitness' 'famine' 'fatal' 'fatalities' 'fatality' 'fear'\n",
+      " 'fire' 'fire%20truck' 'first%20responders' 'flames' 'flattened' 'flood'\n",
+      " 'flooding' 'floods' 'forest%20fire' 'forest%20fires' 'hail' 'hailstorm'\n",
+      " 'harm' 'hazard' 'hazardous' 'heat%20wave' 'hellfire' 'hijack' 'hijacker'\n",
+      " 'hijacking' 'hostage' 'hostages' 'hurricane' 'injured' 'injuries'\n",
+      " 'injury' 'inundated' 'inundation' 'landslide' 'lava' 'lightning'\n",
+      " 'loud%20bang' 'mass%20murder' 'mass%20murderer' 'massacre' 'mayhem'\n",
+      " 'meltdown' 'military' 'mudslide' 'natural%20disaster'\n",
+      " 'nuclear%20disaster' 'nuclear%20reactor' 'obliterate' 'obliterated'\n",
+      " 'obliteration' 'oil%20spill' 'outbreak' 'pandemonium' 'panic' 'panicking'\n",
+      " 'police' 'quarantine' 'quarantined' 'radiation%20emergency' 'rainstorm'\n",
+      " 'razed' 'refugees' 'rescue' 'rescued' 'rescuers' 'riot' 'rioting'\n",
+      " 'rubble' 'ruin' 'sandstorm' 'screamed' 'screaming' 'screams' 'seismic'\n",
+      " 'sinkhole' 'sinking' 'siren' 'sirens' 'smoke' 'snowstorm' 'storm'\n",
+      " 'stretcher' 'structural%20failure' 'suicide%20bomb' 'suicide%20bomber'\n",
+      " 'suicide%20bombing' 'sunk' 'survive' 'survived' 'survivors' 'terrorism'\n",
+      " 'terrorist' 'threat' 'thunder' 'thunderstorm' 'tornado' 'tragedy'\n",
+      " 'trapped' 'trauma' 'traumatised' 'trouble' 'tsunami' 'twister' 'typhoon'\n",
+      " 'upheaval' 'violent%20storm' 'volcano' 'war%20zone' 'weapon' 'weapons'\n",
+      " 'whirlwind' 'wild%20fires' 'wildfire' 'windstorm' 'wounded' 'wounds'\n",
+      " 'wreck' 'wreckage' 'wrecked']\n"
+     ]
+    }
+   ],
+   "source": [
+    "unique_locations = train_data['keyword'].unique()\n",
+    "print(unique_locations)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "aa7231d3",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.429293Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.428440Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.438436Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.437724Z"
+    },
+    "papermill": {
+     "duration": 0.017582,
+     "end_time": "2024-06-06T10:34:22.440266",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.422684",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train_data.fillna('', inplace = True)\n",
+    "test_data.fillna('', inplace = True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "11c5a447",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.450603Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.450319Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.464213Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.463438Z"
+    },
+    "papermill": {
+     "duration": 0.021232,
+     "end_time": "2024-06-06T10:34:22.466108",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.444876",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>keyword</th>\n",
+       "      <th>location</th>\n",
+       "      <th>text</th>\n",
+       "      <th>target</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>1</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>Our Deeds are the Reason of this #earthquake M...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>4</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>Forest fire near La Ronge Sask. Canada</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>5</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>All residents asked to 'shelter in place' are ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>13,000 people receive #wildfires evacuation or...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>7</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>Just got sent this photo from Ruby #Alaska as ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7608</th>\n",
+       "      <td>10869</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>Two giant cranes holding a bridge collapse int...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7609</th>\n",
+       "      <td>10870</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>@aria_ahrary @TheTawniest The out of control w...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7610</th>\n",
+       "      <td>10871</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>M1.94 [01:04 UTC]?5km S of Volcano Hawaii. htt...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7611</th>\n",
+       "      <td>10872</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>Police investigating after an e-bike collided ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7612</th>\n",
+       "      <td>10873</td>\n",
+       "      <td></td>\n",
+       "      <td></td>\n",
+       "      <td>The Latest: More Homes Razed by Northern Calif...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>7613 rows × 5 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "         id keyword location  \\\n",
+       "0         1                    \n",
+       "1         4                    \n",
+       "2         5                    \n",
+       "3         6                    \n",
+       "4         7                    \n",
+       "...     ...     ...      ...   \n",
+       "7608  10869                    \n",
+       "7609  10870                    \n",
+       "7610  10871                    \n",
+       "7611  10872                    \n",
+       "7612  10873                    \n",
+       "\n",
+       "                                                   text  target  \n",
+       "0     Our Deeds are the Reason of this #earthquake M...       1  \n",
+       "1                Forest fire near La Ronge Sask. Canada       1  \n",
+       "2     All residents asked to 'shelter in place' are ...       1  \n",
+       "3     13,000 people receive #wildfires evacuation or...       1  \n",
+       "4     Just got sent this photo from Ruby #Alaska as ...       1  \n",
+       "...                                                 ...     ...  \n",
+       "7608  Two giant cranes holding a bridge collapse int...       1  \n",
+       "7609  @aria_ahrary @TheTawniest The out of control w...       1  \n",
+       "7610  M1.94 [01:04 UTC]?5km S of Volcano Hawaii. htt...       1  \n",
+       "7611  Police investigating after an e-bike collided ...       1  \n",
+       "7612  The Latest: More Homes Razed by Northern Calif...       1  \n",
+       "\n",
+       "[7613 rows x 5 columns]"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "fc1be36c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.477043Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.476783Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.499156Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.498298Z"
+    },
+    "papermill": {
+     "duration": 0.029826,
+     "end_time": "2024-06-06T10:34:22.500953",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.471127",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "keywordEncoder = LabelEncoder()\n",
+    "train_data['keyword'] = keywordEncoder.fit_transform(train_data['keyword'])\n",
+    "test_data['keyword'] = keywordEncoder.transform(test_data['keyword'])\n",
+    "\n",
+    "locationEncoder = LabelEncoder()\n",
+    "train_data['location'] = locationEncoder.fit_transform(train_data['location'])\n",
+    "test_data['location'] = locationEncoder.fit_transform(test_data['location'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "2fcd0ee8",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.512190Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.511914Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.516528Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.515671Z"
+    },
+    "papermill": {
+     "duration": 0.012607,
+     "end_time": "2024-06-06T10:34:22.518596",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.505989",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def preprocessString(s):\n",
+    "    # Remove all non-word characters (everything except numbers and letters)\n",
+    "    s = re.sub(r\"[^\\w\\s]\", '', s)\n",
+    "    # Replace all runs of whitespaces with no space\n",
+    "    s = re.sub(r\"\\s+\", '', s)\n",
+    "    # replace digits with no space\n",
+    "    s = re.sub(r\"\\d\", '', s)\n",
+    "    return s"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "85e0817b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.529786Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.529499Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.543307Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.542458Z"
+    },
+    "papermill": {
+     "duration": 0.021796,
+     "end_time": "2024-06-06T10:34:22.545399",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.523603",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>keyword</th>\n",
+       "      <th>location</th>\n",
+       "      <th>text</th>\n",
+       "      <th>target</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>1</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Our Deeds are the Reason of this #earthquake M...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>4</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Forest fire near La Ronge Sask. Canada</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>5</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>All residents asked to 'shelter in place' are ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>13,000 people receive #wildfires evacuation or...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>7</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Just got sent this photo from Ruby #Alaska as ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7608</th>\n",
+       "      <td>10869</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Two giant cranes holding a bridge collapse int...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7609</th>\n",
+       "      <td>10870</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>@aria_ahrary @TheTawniest The out of control w...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7610</th>\n",
+       "      <td>10871</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>M1.94 [01:04 UTC]?5km S of Volcano Hawaii. htt...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7611</th>\n",
+       "      <td>10872</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Police investigating after an e-bike collided ...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>7612</th>\n",
+       "      <td>10873</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>The Latest: More Homes Razed by Northern Calif...</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>7613 rows × 5 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "         id  keyword  location  \\\n",
+       "0         1        0         0   \n",
+       "1         4        0         0   \n",
+       "2         5        0         0   \n",
+       "3         6        0         0   \n",
+       "4         7        0         0   \n",
+       "...     ...      ...       ...   \n",
+       "7608  10869        0         0   \n",
+       "7609  10870        0         0   \n",
+       "7610  10871        0         0   \n",
+       "7611  10872        0         0   \n",
+       "7612  10873        0         0   \n",
+       "\n",
+       "                                                   text  target  \n",
+       "0     Our Deeds are the Reason of this #earthquake M...       1  \n",
+       "1                Forest fire near La Ronge Sask. Canada       1  \n",
+       "2     All residents asked to 'shelter in place' are ...       1  \n",
+       "3     13,000 people receive #wildfires evacuation or...       1  \n",
+       "4     Just got sent this photo from Ruby #Alaska as ...       1  \n",
+       "...                                                 ...     ...  \n",
+       "7608  Two giant cranes holding a bridge collapse int...       1  \n",
+       "7609  @aria_ahrary @TheTawniest The out of control w...       1  \n",
+       "7610  M1.94 [01:04 UTC]?5km S of Volcano Hawaii. htt...       1  \n",
+       "7611  Police investigating after an e-bike collided ...       1  \n",
+       "7612  The Latest: More Homes Razed by Northern Calif...       1  \n",
+       "\n",
+       "[7613 rows x 5 columns]"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "d5d0366f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.558629Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.557879Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.564334Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.563624Z"
+    },
+    "papermill": {
+     "duration": 0.014818,
+     "end_time": "2024-06-06T10:34:22.566292",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.551474",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def getVocabulory(sentenceList):\n",
+    "    wordList = []\n",
+    "\n",
+    "    stopWords = set(stopwords.words('english'))\n",
+    "    \n",
+    "    for sentence in sentenceList:\n",
+    "        for word in sentence.lower().split():\n",
+    "            processedWord = preprocessString(word)\n",
+    "            if processedWord not in stopWords and processedWord != '':\n",
+    "                wordList.append(processedWord)\n",
+    "\n",
+    "    corpus = Counter(wordList)\n",
+    "    corpus_ = sorted(corpus,key=corpus.get,reverse=True)[:1000]\n",
+    "    onehot_dict = {w:i+1 for i,w in enumerate(corpus_)}\n",
+    "    \n",
+    "    return onehot_dict"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "e1601cb6",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-06-06T10:34:22.578182Z",
+     "iopub.status.busy": "2024-06-06T10:34:22.577899Z",
+     "iopub.status.idle": "2024-06-06T10:34:22.588759Z",
+     "shell.execute_reply": "2024-06-06T10:34:22.587889Z"
+    },
+    "papermill": {
+     "duration": 0.019688,
+     "end_time": "2024-06-06T10:34:22.591261",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.571573",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>keyword</th>\n",
+       "      <th>location</th>\n",
+       "      <th>text</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Just happened a terrible car crash</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>2</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Heard about #earthquake is different cities, s...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>3</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>there is a forest fire at spot pond, geese are...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>9</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Apocalypse lighting. #Spokane #wildfires</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>11</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Typhoon Soudelor kills 28 in China and Taiwan</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3258</th>\n",
+       "      <td>10861</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>EARTHQUAKE SAFETY LOS ANGELES ÛÒ SAFETY FASTE...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3259</th>\n",
+       "      <td>10865</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Storm in RI worse than last hurricane. My city...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3260</th>\n",
+       "      <td>10868</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>Green Line derailment in Chicago http://t.co/U...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3261</th>\n",
+       "      <td>10874</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>MEG issues Hazardous Weather Outlook (HWO) htt...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3262</th>\n",
+       "      <td>10875</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>#CityofCalgary has activated its Municipal Eme...</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>3263 rows × 4 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "         id  keyword  location  \\\n",
+       "0         0        0         0   \n",
+       "1         2        0         0   \n",
+       "2         3        0         0   \n",
+       "3         9        0         0   \n",
+       "4        11        0         0   \n",
+       "...     ...      ...       ...   \n",
+       "3258  10861        0         0   \n",
+       "3259  10865        0         0   \n",
+       "3260  10868        0         0   \n",
+       "3261  10874        0         0   \n",
+       "3262  10875        0         0   \n",
+       "\n",
+       "                                                   text  \n",
+       "0                    Just happened a terrible car crash  \n",
+       "1     Heard about #earthquake is different cities, s...  \n",
+       "2     there is a forest fire at spot pond, geese are...  \n",
+       "3              Apocalypse lighting. #Spokane #wildfires  \n",
+       "4         Typhoon Soudelor kills 28 in China and Taiwan  \n",
+       "...                                                 ...  \n",
+       "3258  EARTHQUAKE SAFETY LOS ANGELES ÛÒ SAFETY FASTE...  \n",
+       "3259  Storm in RI worse than last hurricane. My city...  \n",
+       "3260  Green Line derailment in Chicago http://t.co/U...  \n",
+       "3261  MEG issues Hazardous Weather Outlook (HWO) htt...  \n",
+       "3262  #CityofCalgary has activated its Municipal Eme...  \n",
+       "\n",
+       "[3263 rows x 4 columns]"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "test_data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b8764687",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00619,
+     "end_time": "2024-06-06T10:34:22.603822",
+     "exception": false,
+     "start_time": "2024-06-06T10:34:22.597632",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "gpu",
+   "dataSources": [
+    {
+     "databundleVersionId": 869809,
+     "sourceId": 17777,
+     "sourceType": "competition"
+    }
+   ],
+   "dockerImageVersionId": 30732,
+   "isGpuEnabled": true,
+   "isInternetEnabled": true,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.13"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 10.003467,
+   "end_time": "2024-06-06T10:34:23.830045",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-06-06T10:34:13.826578",
+   "version": "2.5.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
